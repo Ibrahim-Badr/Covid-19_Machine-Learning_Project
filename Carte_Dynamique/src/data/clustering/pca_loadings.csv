@@ -1,0 +1,16 @@
+,PC1,PC2
+rea_rate_max,0.4211,-0.0276
+hosp_rate_mean,0.3697,0.1378
+hosp_rate_max,0.3481,0.2225
+rea_rate_mean,0.3326,-0.1305
+new_hosp_rate_max,0.2688,0.4323
+couv_complet_lag14_mean,-0.2688,0.1204
+couv_complet_max,-0.2567,0.0934
+tx_pos_7j_mean,-0.2293,0.2141
+tx_pos_mean,-0.2275,0.2162
+tx_pos_max,-0.2253,0.4571
+new_hosp_rate_mean,0.2142,0.4652
+icu_pressure_max,-0.1878,0.1889
+icu_pressure_mean,0.0584,-0.2463
+cfr_mean,0.0533,0.2888
+cfr_max,0.0371,0.0767

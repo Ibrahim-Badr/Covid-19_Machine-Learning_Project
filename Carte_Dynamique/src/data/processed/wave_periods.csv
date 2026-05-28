@@ -1,0 +1,8 @@
+wave,start,end,label
+1,2020-03-01,2020-06-30,Vague 1 — printemps 2020
+2,2020-09-01,2021-02-28,Vague 2 — automne/hiver 2020
+3,2021-03-01,2021-06-30,Vague 3 — printemps 2021 (Alpha)
+4,2021-07-01,2021-11-30,Vague 4 — été 2021 (Delta)
+5,2021-12-01,2022-03-31,Vague 5 — hiver 2021/22 (Omicron BA.1)
+6,2022-04-01,2022-07-31,Vague 6 — printemps 2022 (Omicron BA.2/BA.5)
+7,2022-10-01,2023-02-28,Vague 7 — hiver 2022/23

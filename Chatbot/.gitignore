@@ -1,0 +1,63 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+*.venv
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+*.lnk
+$RECYCLE.BIN/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Streamlit local settings
+.streamlit/secrets.toml
+
+# Logs, temporary files, and reports
+*.log
+*.tmp
+*.temp
+*.bak
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Optional generated artifacts
+# Uncomment these lines if regenerated data/model files should stay out of git.
+# data/layer_bronze_data_brut/*.csv
+# data/layer_silver_data_transform/*.csv
+# data/layer_gold_data_model/*.csv
+# data/layer_gold_data_model/modele_final/*.joblib

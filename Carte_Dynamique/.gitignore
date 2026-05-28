@@ -1,0 +1,57 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.suo
+*.user
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+Thumbs.db
+$RECYCLE.BIN/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# VS Code Java mirror/scaffolding
+bin/
+
+# Large downloaded data files
+src/data/labs/indicateurs_suivi.csv
+src/data/raw/kalisio_dept.geojson
+src/data/vaccines/vaccination_age_dept.csv
+src/data/labs/sidep_new.csv
+src/data/vaccines/vaccination_marque.csv
+
+# Local installers
+src/Miniconda3-latest-MacOSX-arm64.sh

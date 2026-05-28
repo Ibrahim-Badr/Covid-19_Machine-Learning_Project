@@ -1,0 +1,42 @@
+============================================================
+PHASE 3 CLUSTERING — INTERPRETABILITY REPORT
+============================================================
+Feature matrix     : 101 depts × 15 features
+Scaler             : RobustScaler (median + IQR)
+PCA 90% variance   : 7 components
+PCA 95% variance   : 8 components
+
+K-MEANS
+  Optimal k        : 2
+  Silhouette       : 0.2406
+  Calinski-Harabász: 26.7
+  Davies-Bouldin   : 1.6041
+
+DBSCAN
+  Best eps         : 2.0
+  Best min_samples : 3
+  Clusters found   : 2
+  Outliers (noise) : 16
+  Silhouette       : 0.1268
+
+PCA LOADINGS (top 5 PC1 drivers):
+  rea_rate_max                   PC1=+0.4211  PC2=-0.0276
+  hosp_rate_mean                 PC1=+0.3697  PC2=+0.1378
+  hosp_rate_max                  PC1=+0.3481  PC2=+0.2225
+  rea_rate_mean                  PC1=+0.3326  PC2=-0.1305
+  new_hosp_rate_max              PC1=+0.2688  PC2=+0.4323
+
+CLUSTER PROFILES (K-Means means):
+  Cluster 0 (25 depts):
+    hosp_rate_mean                 37.1078
+    tx_pos_mean                    9.4546
+    couv_complet_max               75.2360
+    cfr_mean                       18.3964
+  Cluster 1 (71 depts):
+    hosp_rate_mean                 22.4659
+    tx_pos_mean                    11.3015
+    couv_complet_max               79.4268
+    cfr_mean                       17.7649
+
+============================================================
+🚀 Phase 3 complete — ready for Phase 4: ML Models
