@@ -1,9 +1,6 @@
 {
   "nom_modele": "XGBoost",
-  "metriques": {
-    "f1_score": 0.57,
-    "auc_roc": 0.65
-  },
+  "seuil_optimal": 0.40000000000000013,
   "features": [
     "Sexe",
     "Type_de_patient",
@@ -22,5 +19,32 @@
     "Tranche_Age_tranche_age_jeune",
     "Tranche_Age_tranche_age_adulte",
     "Tranche_Age_tranche_age_senior"
-  ]
+  ],
+  "metriques": {
+    "accuracy": 0.5164418212478921,
+    "precision": 0.43628694166968585,
+    "recall": 0.830083702609552,
+    "f1_score": 0.5719568462477949,
+    "auc_roc": 0.6572465856528198,
+    "pr_auc": 0.5569623626613179
+  },
+  "description_features": {
+    "Sexe": "0=Femme, 1=Homme",
+    "Type_de_patient": "0=Ambulatoire, 1=Hospitalise",
+    "Pneumonie": "0=Non, 1=Oui",
+    "Diabète": "0=Non, 1=Oui",
+    "Bronchopneumopathie_chronique_obstructive": "0=Non, 1=Oui",
+    "Asthme": "0=Non, 1=Oui",
+    "Immunosuppression": "0=Non, 1=Oui",
+    "Hypertension": "0=Non, 1=Oui",
+    "Autre_comorbidité": "0=Non, 1=Oui",
+    "Maladie_cardiovasculaire": "0=Non, 1=Oui",
+    "Obésité": "0=Non, 1=Oui",
+    "Insuffisance_rénale_chronique": "0=Non, 1=Oui",
+    "Tabagisme": "0=Non, 1=Oui",
+    "Tranche_Age_tranche_age_enfant": "1 si age 0-17 ans",
+    "Tranche_Age_tranche_age_jeune": "1 si age 18-39 ans",
+    "Tranche_Age_tranche_age_adulte": "1 si age 40-59 ans",
+    "Tranche_Age_tranche_age_senior": "1 si age 60+ ans"
+  }
 }
