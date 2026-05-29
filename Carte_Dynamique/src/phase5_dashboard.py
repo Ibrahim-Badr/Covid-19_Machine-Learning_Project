@@ -15,7 +15,7 @@ Sections :
   ④ Ligne 2 : top-15 depts (barres) | scatter positivité vs hosp.
   ⑤ Détail département (affiché au clic)
 """
-import os, json
+import os, json, pickle
 import numpy as np
 import pandas as pd
 
@@ -25,6 +25,7 @@ DAILY_CSV   = "data/processed/master_dept_daily.csv"
 GEO_FILE    = "data/processed/master_dept_geo.geojson"
 CLUSTER_CSV = "data/clustering/global_cluster_labels.csv"
 WAVE_CSV    = "data/processed/wave_periods.csv"
+MODEL_PKL   = "data/models/best_model.pkl"
 OUT_FILE    = "outputs/dashboard_covid.html"
 
 
@@ -170,8 +171,87 @@ if "population" in df.columns:
         if not pd.isna(v):
             dept_pop[dep] = int(v)
 
+# ─────────────────────────── PRÉDICTIONS ML ──────────────────
+print("\nSTEP 4 — Prédictions ML (best_model.pkl)")
+dept_pred: dict[str, list] = {}
+nat_pred_arr: list = [None] * len(weekly_dates)
+
+if os.path.exists(MODEL_PKL):
+    try:
+        with open(MODEL_PKL, "rb") as _f:
+            _pkl = pickle.load(_f)
+
+        # Le pkl est un dict {model, features, target, ...}
+        best_pipe = _pkl["model"]
+        all_feats = list(_pkl["features"])
+
+        df_feat = df.copy()
+
+        # Merge cluster labels (feature kmeans_cluster)
+        if clusters:
+            df_feat["kmeans_cluster"] = df_feat["dep"].map(clusters).fillna(0).astype(int)
+
+        # Construire les colonnes laggées manquantes
+        LAG_SPECS_PRED = [
+            ("hosp_rate",     7), ("hosp_rate",     14),
+            ("new_hosp_rate", 7), ("new_hosp_rate",  1),
+            ("tx_pos_7j",     7),
+        ]
+        for _col, _lag in LAG_SPECS_PRED:
+            _nc = f"{_col}_lag{_lag}"
+            if _nc in all_feats and _nc not in df_feat.columns and _col in df_feat.columns:
+                df_feat[_nc] = df_feat.groupby("dep")[_col].shift(_lag)
+
+        # Garder uniquement les features réellement disponibles
+        all_feats = [f for f in all_feats if f in df_feat.columns]
+
+        mask_ok = df_feat[all_feats].notna().all(axis=1)
+        df_p = df_feat.loc[mask_ok, ["dep", "jour"] + all_feats].copy()
+        X_p = df_p[all_feats].to_numpy(dtype=float)
+        df_p["pred"] = best_pipe.predict(X_p).clip(min=0)
+
+        # Weekly average per dept
+        df_pw = (
+            df_p[["dep", "jour", "pred"]]
+            .set_index("jour")
+            .groupby("dep")
+            .resample("W")["pred"]
+            .mean()
+            .reset_index()
+        )
+        df_pw["jour_str"] = df_pw["jour"].dt.strftime("%Y-%m-%d")
+        for _dep, _grp in df_pw.groupby("dep"):
+            _s = _grp.set_index("jour_str")["pred"].reindex(weekly_dates)
+            dept_pred[str(_dep)] = [
+                None if pd.isna(v) else round(float(v), 2) for v in _s
+            ]
+
+        # Weekly national average prediction
+        df_nat_pw = (
+            df_p[["jour", "pred"]]
+            .set_index("jour")
+            .resample("W")["pred"]
+            .mean()
+            .reset_index()
+        )
+        df_nat_pw["jour_str"] = df_nat_pw["jour"].dt.strftime("%Y-%m-%d")
+        _nat_map = {
+            row["jour_str"]: round(float(row["pred"]), 2)
+            for _, row in df_nat_pw.iterrows()
+            if not pd.isna(row["pred"])
+        }
+        nat_pred_arr = [_nat_map.get(d) for d in weekly_dates]
+
+        print(f"  ✓ Prédictions générées : {len(dept_pred)} depts")
+        print(f"  ✓ Couverture temporelle : "
+              f"{sum(1 for v in nat_pred_arr if v is not None)}/{len(weekly_dates)} semaines")
+    except Exception as _e:
+        print(f"  ⚠️  Erreur modèle : {_e}")
+else:
+    print(f"  ⚠️  Modèle absent ({MODEL_PKL}) — prédictions désactivées")
+
 # ─────────────────────────── JSON ────────────────────────────
-print("\nSTEP 4 — Sérialisation JSON")
+print("\nSTEP 5 — Sérialisation JSON")
 
 def to_json(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
@@ -185,8 +265,11 @@ j_dnames   = to_json(dept_names)
 j_metrics  = to_json(METRICS)
 j_wdates   = to_json(weekly_dates)
 j_pop      = to_json(dept_pop)
+j_pred     = to_json(dept_pred)
+j_nat_pred = to_json(nat_pred_arr)
 
-for name, val in [("nat_data", j_nat), ("dept_ts", j_dept), ("geo", j_geo)]:
+for name, val in [("nat_data", j_nat), ("dept_ts", j_dept), ("geo", j_geo),
+                  ("dept_pred", j_pred)]:
     print(f"  ✓ {name} : {len(val)/1024:.0f} KB")
 
 # ─────────────────────────── HTML ────────────────────────────
@@ -229,13 +312,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 #wave-badge.on{background:#dbeafe;color:#1d4ed8}
 
 /* KPI */
-#kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:12px 24px}
+#kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:12px 24px}
 .kpi{background:#fff;border-radius:10px;padding:12px 16px;
      box-shadow:0 1px 4px rgba(0,0,0,.07);display:flex;flex-direction:column;gap:3px}
 .kpi-lbl{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8}
 .kpi-val{font-size:1.5rem;font-weight:800;line-height:1.1;color:#1a2b4a}
 .kpi-trnd{font-size:.73rem;color:#94a3b8}
 .kpi-trnd.up{color:#ef4444}.kpi-trnd.dn{color:#22c55e}.kpi-trnd.dn-bad{color:#ef4444}.kpi-trnd.up-good{color:#22c55e}
+.kpi-pred{border-top:3px solid #f59e0b;background:#fffbeb}
+.kpi-pred .kpi-val{color:#b45309}
+.pred-badge{display:inline-block;font-size:.62rem;background:#fef3c7;color:#b45309;
+            border-radius:4px;padding:1px 5px;font-weight:600;margin-top:2px}
 
 /* CHARTS */
 .row{display:grid;gap:10px;padding:0 24px 10px}
@@ -258,6 +345,7 @@ footer{text-align:center;padding:10px;font-size:.68rem;color:#94a3b8}
 
 @media(max-width:900px){
   #kpis{grid-template-columns:repeat(3,1fr)}
+  #kpi-pred{display:none}
   .row1,.row2{grid-template-columns:1fr}
 }
 @media(max-width:580px){#kpis{grid-template-columns:repeat(2,1fr)}}
@@ -315,6 +403,11 @@ footer{text-align:center;padding:10px;font-size:.68rem;color:#94a3b8}
     <div class="kpi-val" id="kv-vacc">&mdash;</div>
     <div class="kpi-trnd" id="kt-vacc"></div>
   </div>
+  <div class="kpi kpi-pred" id="kpi-pred">
+    <div class="kpi-lbl">Hosp. pr&eacute;dit /100K</div>
+    <div class="kpi-val" id="kv-pred">&mdash;</div>
+    <div class="pred-badge">HistGradBoost</div>
+  </div>
 </div>
 
 <div class="row row1">
@@ -325,6 +418,18 @@ footer{text-align:center;padding:10px;font-size:.68rem;color:#94a3b8}
   <div class="card">
     <div class="card-title">&#x1F5FA;&#xFE0F; Carte France &mdash; <span id="map-lbl">Hosp. /100K</span></div>
     <div id="ch-map"></div>
+  </div>
+</div>
+
+<div class="row" style="padding:0 24px 10px">
+  <div class="card" id="pred-card">
+    <div class="card-title">
+      &#x1F916; Pr&eacute;diction ML vs R&eacute;el &mdash; Hosp. /100K (moyenne nationale)
+      <span style="float:right;font-size:.7rem;font-weight:400;color:#94a3b8">
+        HistGradBoost &middot; R&sup2;&nbsp;=&nbsp;0.974 &middot; MAE&nbsp;=&nbsp;1.14
+      </span>
+    </div>
+    <div id="ch-pred"></div>
   </div>
 </div>
 
@@ -358,6 +463,8 @@ const DNAMES   = __DNAMES__;
 const METRICS  = __METRICS__;
 const WDATES   = __WDATES__;
 const POP      = __POP__;
+const DEPT_PRED  = __DEPT_PRED__;
+const NAT_PRED   = __NAT_PRED__;
 
 // ── ÉTAT ─────────────────────────────────────────────────────
 let curIdx    = WDATES.length - 1;
@@ -494,6 +601,13 @@ function updateKPIs() {
   set('dc',    NAT.dc?.[ni],         NAT.dc?.[ni7],          0, '');
   set('txpos', NAT.tx_pos_7j?.[ni],  NAT.tx_pos_7j?.[ni7],  1, '%');
   set('vacc',  NAT.couv_complet?.[ni], NAT.couv_complet?.[ni7], 1, '%', false);
+
+  // KPI prédiction ML nationale
+  const predEl = document.getElementById('kv-pred');
+  if (predEl && NAT_PRED && NAT_PRED.length) {
+    const pv = NAT_PRED[curIdx];
+    predEl.textContent = pv !== null && pv !== undefined ? fmtNum(pv, 1, '') : '—';
+  }
 }
 
 // ── GRAPHIQUE NATIONAL ────────────────────────────────────────
@@ -510,11 +624,6 @@ function initNatChart() {
     line:{color:'#ef4444', width:2},
     fill:'tozeroy', fillcolor:'rgba(239,68,68,.12)',
     hovertemplate:'%{y:,.0f}<extra>Réanimation</extra>',
-  });
-  if (NAT.new_hosp_7j) traces.push({
-    x:NAT.dates, y:NAT.new_hosp_7j, type:'scatter', mode:'lines', name:'Nouv. hosp. 7j',
-    line:{color:'#f59e0b', width:1.5, dash:'dot'},
-    hovertemplate:'%{y:,.0f}<extra>Nouv. hosp. 7j</extra>',
   });
   if (NAT.tx_pos_7j) traces.push({
     x:NAT.dates, y:NAT.tx_pos_7j, type:'scatter', mode:'lines', name:'Positivité 7j (%)',
@@ -545,6 +654,59 @@ function initNatChart() {
 function updateNatCursor() {
   const si = WAVES.length; // cursor is the last shape
   Plotly.relayout('ch-nat', {
+    [`shapes[${si}].x0`]: WDATES[curIdx],
+    [`shapes[${si}].x1`]: WDATES[curIdx],
+  });
+}
+
+// ── GRAPHIQUE PRÉDICTION vs RÉEL ──────────────────────────────
+function initPredChart() {
+  const hasPred = NAT_PRED && NAT_PRED.some(v => v !== null);
+  const card = document.getElementById('pred-card');
+
+  // Courbe réelle hosp_rate national (moyenne départements)
+  const traces = [];
+  if (NAT.hosp_rate) traces.push({
+    x: NAT.dates, y: NAT.hosp_rate,
+    type:'scatter', mode:'lines', name:'Hosp. /100K réel',
+    line:{color:'#3b82f6', width:2.5},
+    fill:'tozeroy', fillcolor:'rgba(59,130,246,.08)',
+    hovertemplate:'%{y:.2f}<extra>Réel (moy. nationale)</extra>',
+  });
+
+  if (hasPred) traces.push({
+    x: WDATES, y: NAT_PRED,
+    type:'scatter', mode:'lines', name:'Prédiction ML ✦',
+    line:{color:'#f59e0b', width:2.5, dash:'dash'},
+    hovertemplate:'%{y:.2f}<extra>Prédiction ML</extra>',
+  });
+
+  if (!traces.length) { if (card) card.style.display='none'; return; }
+
+  const cursorShape = {
+    type:'line', xref:'x', yref:'paper',
+    x0:WDATES[curIdx], x1:WDATES[curIdx], y0:0, y1:1,
+    line:{color:'#1a2b4a', width:1.5, dash:'dot'},
+  };
+
+  const layout = {
+    height:220, margin:{l:52,r:20,t:6,b:42},
+    paper_bgcolor:'#fff', plot_bgcolor:'#fff',
+    legend:{orientation:'h', y:-0.22, x:0, font:{size:11}},
+    xaxis:{showgrid:true, gridcolor:'#f0f4f8', tickfont:{size:10}},
+    yaxis:{title:{text:'Hosp. /100K', font:{size:10}},
+           showgrid:true, gridcolor:'#f0f4f8', tickfont:{size:10}},
+    shapes:[...waveShapes(), cursorShape],
+    hovermode:'x unified',
+  };
+  Plotly.newPlot('ch-pred', traces, layout, {responsive:true, displayModeBar:false});
+}
+
+function updatePredCursor() {
+  const el = document.getElementById('ch-pred');
+  if (!el || !el.data || !el.data.length) return;
+  const si = WAVES.length;
+  Plotly.relayout('ch-pred', {
     [`shapes[${si}].x0`]: WDATES[curIdx],
     [`shapes[${si}].x1`]: WDATES[curIdx],
   });
@@ -698,13 +860,25 @@ function showDeptDetail(dep) {
     };
   };
 
-  const traces = [
-    addTrace('hosp_rate',     'Hosp. /100K',         '#3b82f6'),
-    addTrace('new_hosp_rate', 'Nouv. hosp. /100K',   '#f59e0b', 'dot'),
-    addTrace('icu_pressure',  'Pression réa (%)',     '#ef4444', 'dash'),
-    addTrace('tx_pos_7j',     'Positivité 7j (%)',    '#8b5cf6', 'solid', 'y2'),
-    addTrace('couv_complet',  'Couv. vaccinale (%)',  '#22c55e', 'dash',  'y2'),
-  ].filter(Boolean);
+  // Prédiction en premier pour qu'elle soit en fond
+  const traces = [];
+  const predVals = DEPT_PRED && DEPT_PRED[dep];
+  if (predVals && predVals.some(v => v !== null)) {
+    traces.push({
+      x: WDATES, y: predVals,
+      type:'scatter', mode:'lines',
+      name:'Prédiction ML ✦',
+      line:{color:'#f59e0b', width:2.5, dash:'dash'},
+      hovertemplate:'%{y:.2f}<extra>Prédiction ML (HistGradBoost)</extra>',
+    });
+  }
+
+  [
+    addTrace('hosp_rate',     'Hosp. /100K (réel)',   '#3b82f6'),
+    addTrace('icu_pressure',  'Pression réa (%)',      '#ef4444', 'dash'),
+    addTrace('tx_pos_7j',     'Positivité 7j (%)',     '#8b5cf6', 'solid', 'y2'),
+    addTrace('couv_complet',  'Couv. vaccinale (%)',   '#22c55e', 'dash',  'y2'),
+  ].forEach(tr => { if (tr) traces.push(tr); });
 
   const layout = {
     height:290, margin:{l:52,r:52,t:6,b:52},
@@ -732,6 +906,7 @@ function updateAll() {
   updateWaveBadge();
   updateKPIs();
   updateNatCursor();
+  updatePredCursor();
   updateMap();
   updateBar();
   updateScatter();
@@ -741,6 +916,7 @@ function updateAll() {
 document.addEventListener('DOMContentLoaded', () => {
   initControls();
   initNatChart();
+  initPredChart();
   initMap();
   initBar();
   initScatter();
@@ -761,6 +937,8 @@ HTML = HTML.replace("__DNAMES__",   j_dnames)
 HTML = HTML.replace("__METRICS__",  j_metrics)
 HTML = HTML.replace("__WDATES__",   j_wdates)
 HTML = HTML.replace("__POP__",      j_pop)
+HTML = HTML.replace("__DEPT_PRED__", j_pred)
+HTML = HTML.replace("__NAT_PRED__",  j_nat_pred)
 
 with open(OUT_FILE, "w", encoding="utf-8") as f:
     f.write(HTML)
